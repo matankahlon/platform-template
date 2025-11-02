@@ -7,7 +7,12 @@
       "properties": {
         "repository": { "type": "string", "minLength": 1 },
         "tag": { "type": "string", "minLength": 1 },
-        "pullPolicy": { "type": "string" }
+        "pullPolicy": { "type": "string" },
+        "pullSecrets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of secret names for pulling images from private registry"
+        }
       },
       "required": ["repository", "tag"]
     },
@@ -15,18 +20,13 @@
       "type": "object",
       "properties": {
         "type": { "type": "string" },
-        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "annotations": {
+          "type": "object",
+          "description": "Additional annotations for the Service"
+        }
       },
       "required": ["port"]
-    },
-    "ingress": {
-      "type": "object",
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "host": { "type": "string" },
-        "path": { "type": "string" }
-      },
-      "required": ["enabled"]
     },
     "labels": {
       "type": "object",
@@ -36,9 +36,22 @@
         "dcsIngress": {
           "type": "object",
           "properties": {
-            "enabled": { "type": "boolean" },
-            "host": { "type": "string" },
-            "path": { "type": "string" }
+            "enabled": { 
+              "type": "boolean",
+              "description": "Whether to create HTTPRoute (Kyverno reads this label)"
+            },
+            "host": { 
+              "type": "string",
+              "description": "Domain name (empty = auto-set by Kyverno)"
+            },
+            "path": { 
+              "type": "string",
+              "description": "URL path (e.g., '/api/v1' or '/')"
+            },
+            "tls": { 
+              "type": "boolean",
+              "description": "Enable TLS using cluster-wide certificate"
+            }
           },
           "required": ["enabled"]
         }
@@ -46,6 +59,6 @@
       "required": ["managedBy", "owner", "dcsIngress"]
     }
   },
-  "required": ["image", "service", "ingress", "labels"]
+  "required": ["image", "service", "labels"]
 }
 

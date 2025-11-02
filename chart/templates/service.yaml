@@ -1,28 +1,61 @@
+{{- /*
+==============================================================================
+service.yaml - Kubernetes Service Template
+This file creates a Service that connects your Pods to Kubernetes internal network
+Service = stable access point to Pods (with IP and internal DNS)
+==============================================================================
+*/}}
+
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "dcs-app.fullname" . }}
   labels:
+    # Standard labels - for navigation and selection
     app.kubernetes.io/name: {{ include "dcs-app.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
+    
+    # Platform labels
     managed-by: {{ .Values.labels.managedBy | quote }}
     owner: {{ .Values.labels.owner | quote }}
-    dcs.ingress/enabled: {{ .Values.labels.dcsIngress.enabled | quote }}
-    dcs.ingress/host: {{ default "" .Values.labels.dcsIngress.host | quote }}
-    dcs.ingress/path: {{ default "/" .Values.labels.dcsIngress.path | quote }}
-  annotations:
-    {{- if .Values.ingress.enabled }}
-    expose: "true"
+    
+    # Labels for HTTPRoute - Kyverno uses these to create HTTPRoute automatically for NGINX Gateway Fabric
+    dcs.ingress/enabled: {{ .Values.labels.dcsIngress.enabled | quote }}  # Whether to create HTTPRoute
+    dcs.ingress/host: {{ default "" .Values.labels.dcsIngress.host | quote }}  # Domain (e.g., "my-app.example.com")
+    dcs.ingress/path: {{ default "/" .Values.labels.dcsIngress.path | quote }}  # URL path (e.g., "/api/v1")
+    {{- if .Values.labels.dcsIngress.tls }}
+    dcs.ingress/tls: {{ .Values.labels.dcsIngress.tls | quote }}  # Enable TLS (uses cluster-wide certificate)
     {{- end }}
+  
+  {{- if or .Values.labels.dcsIngress.enabled .Values.service.annotations }}
+  annotations:
+    {{- if .Values.labels.dcsIngress.enabled }}
+    expose: "true"  # Kyverno looks for this to create HTTPRoute (modern replacement for Ingress)
+    # When labels.dcsIngress.enabled=true, Service gets this annotation → Kyverno creates HTTPRoute automatically
+    {{- end }}
+    {{- if .Values.service.annotations }}
     {{- toYaml .Values.service.annotations | nindent 4 }}
+    {{- end }}
+  {{- end }}
+
 spec:
+  # Service type - usually ClusterIP (internal access only)
+  # Options: ClusterIP (default), NodePort, LoadBalancer
   type: {{ .Values.service.type }}
+  
+  # Selector - which Pods the Service points to
+  # Must match Pod labels (see deployment.yaml)
   selector:
     app.kubernetes.io/name: {{ include "dcs-app.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
+  
+  # Ports - ports the service listens on
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
+    - port: {{ .Values.service.port }}  # Service port (how to connect to Service)
+      targetPort: {{ .Values.service.port }}  # Container port (where Pod listens)
       protocol: TCP
       name: http
-
+  
+  # 📝 Note: After Service is created, you can connect via:
+  # - Internal DNS: <service-name>.<namespace>.svc.cluster.local
+  # - Or shorthand in same namespace: <service-name>

@@ -1,31 +1,61 @@
+# ==============================================================================
+# platform-config.yaml - General Platform Settings
+# This file defines shared settings for all applications on the platform
+# ==============================================================================
+# 📝 Note: This is a guidance/documentation file - not used directly in Helm Chart
+# Purpose: Help developers understand the standard platform settings
+# 🔧 Change! - Update details according to your platform
+# ==============================================================================
+
 platform:
-  name: "dcs-platform"
+  name: "dcs-platform"  # 🔧 Change! - Platform name
+  
+  # Registry settings - where Docker images and Charts are stored
   registry:
-    url: "registry.example.com"
-    org: "dcs"
-    chart_repo: "charts"   # optional OCI helm repo
+    url: "registry.example.com"  # 🔧 Must change! - Registry address (e.g., "registry.company.com")
+    org: "dcs"  # 🔧 Change! - Organization/namespace in Registry (e.g., "company", "my-team")
+    chart_repo: "charts"  # 🔧 Optional - OCI Helm repository (if using Helm OCI registry)
+  
+  # Tagging Strategy
   tagging:
-    strategy: "git-sha"     # options: git-sha, semver, datetime
-    latestAlias: true
+    strategy: "git-sha"  # 🔧 Change! - How to tag images:
+      # "git-sha" = commit SHA (e.g., "abc1234") - recommended!
+      # "semver" = semantic versioning (e.g., "v1.2.3")
+      # "datetime" = timestamp (e.g., "20240101120000")
+    latestAlias: true  # ✅ Whether to create "latest" tag in addition (recommended for staging)
 
+  # Conventions - standard platform settings
   conventions:
-    managedByLabel: "dcs-platform"
-    ownerDefault: "default"
-    serviceExposeAnnotation: "expose"  # Kyverno listens for expose: "true"
+    managedByLabel: "dcs-platform"  # ✅ Don't change - Label identifying that app is managed by platform
+    ownerDefault: "default"  # 🔧 Change! - Default owner (if not set)
+    serviceExposeAnnotation: "expose"  # ✅ Don't change - Kyverno looks for this annotation to create HTTPRoute
+      # Kyverno looks for expose: "true" in Service to create HTTPRoute automatically
+      # HTTPRoute is the modern Gateway API replacement for the legacy Ingress resource
+    
+    # Gateway settings - how Kyverno creates HTTPRoute for NGINX Gateway Fabric
     gateway:
-      name: "dcs-gateway-fabric"
-      namespace: "nginx-gateway"
+      name: "dcs-gateway-fabric"  # 🔧 Change! - Gateway name in Kubernetes (NGINX Gateway Fabric)
+      namespace: "nginx-gateway"  # 🔧 Change! - Namespace where Gateway is located (usually "nginx-gateway")
+      tls: true  # ✅ Uses cluster-wide TLS certificate managed by NGINX Gateway Fabric
+    
+    # Labels for HTTPRoute - how Kyverno identifies HTTPRoute metadata
+    # Note: We use "ingress" in the label names for backward compatibility, but these create HTTPRoute resources
     ingressLabels:
-      enabledKey: "dcs.ingress/enabled"
-      hostKey: "dcs.ingress/host"
-      pathKey: "dcs.ingress/path"
+      enabledKey: "dcs.ingress/enabled"  # ✅ Don't change - Label identifying whether to create HTTPRoute
+      hostKey: "dcs.ingress/host"  # ✅ Don't change - Label identifying the domain
+      pathKey: "dcs.ingress/path"  # ✅ Don't change - Label identifying the path
 
+  # Default settings - recommended values to use
   defaults:
     service:
-      type: "ClusterIP"
-      port: 80
+      type: "ClusterIP"  # ✅ Default - internal Service (usually no need to change)
+      port: 80  # 🔧 Default - update according to your application (3000, 8080, etc.)
+    
+    # Default security settings
     security:
-      runAsUser: 10001
-      runAsGroup: 10001
-      fsGroup: 10001
+      runAsUser: 10001  # ✅ UID of non-root user (recommended not to change)
+      runAsGroup: 10001  # ✅ GID of non-root group (recommended not to change)
+      fsGroup: 10001  # ✅ GID for volumes (recommended not to change)
 
+# 📝 Note: This file is not loaded automatically - this is a guidance file
+# Use the values here in your application's values.yaml

@@ -1,16 +1,43 @@
+# ==============================================================================
+# Dockerfile.base - Docker Base Image Template
+# This file defines a base image for DCS applications
+# ==============================================================================
+# 📝 Note: This is a template - you'll probably want to create your own Dockerfile for the application
+# Files will be copied to /app and container will run as non-root user (security)
+# ==============================================================================
+
+# Base image - Distroless (minimal, high security, not root)
+# distroless = minimal image without shell/package manager (only binaries)
+# nonroot = runs as regular user (uid 65532), not root
 FROM gcr.io/distroless/base-debian12:nonroot
 
+# OCI Labels - image metadata (conforms to OCI spec)
+# 🔧 Change! - Update details according to your application:
 LABEL org.opencontainers.image.title="dcs-app-base" \
       org.opencontainers.image.description="Minimal non-root base for DCS apps" \
       org.opencontainers.image.vendor="DCS Platform" \
       org.opencontainers.image.source="https://example.com/platform-template" \
       org.opencontainers.image.licenses="Apache-2.0"
 
+# Working directory - where the container runs
+# Application files will be copied here
 WORKDIR /app
 
-# Expect app image to COPY built artifacts to /app and run as non-root
+# 📝 Note: Expect application image to copy artifacts to /app and run as non-root user
+# Example in application:
+#   COPY --from=builder /app/dist /app
+#   USER 65532:65532  # Or another user if needed
+#   ENTRYPOINT ["/app/my-app"]
+
+# User - non-root user (uid 65532, gid 65532)
+# This is a built-in user in distroless nonroot images
+# 🔧 If application requires another user, change (but recommended to keep non-root!)
 USER 65532:65532
 
+# Entrypoint - what runs when container starts
+# ⚠️ This is just an example - in your application change to your app's CMD
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["sleep infinity"]
 
+# CMD - default command (optional if Entrypoint is set)
+# ⚠️ This is just an example - in your application change to preview/test command
+CMD ["sleep infinity"]

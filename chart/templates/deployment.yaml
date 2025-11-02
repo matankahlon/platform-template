@@ -1,68 +1,175 @@
+{{- /*
+==============================================================================
+deployment.yaml - Kubernetes Deployment Template
+This file creates a Deployment that runs your Pods
+Deployment = manages pods, ensures enough pods, performs rolling updates
+==============================================================================
+*/}}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "dcs-app.fullname" . }}
   labels:
-    app.kubernetes.io/name: {{ include "dcs-app.name" . }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion }}
-    app.kubernetes.io/managed-by: Helm
-    managed-by: {{ .Values.labels.managedBy | quote }}
-    owner: {{ .Values.labels.owner | quote }}
-    dcs.ingress/enabled: {{ .Values.labels.dcsIngress.enabled | quote }}
-    dcs.ingress/host: {{ default "" .Values.labels.dcsIngress.host | quote }}
-    dcs.ingress/path: {{ default "/" .Values.labels.dcsIngress.path | quote }}
+    # Standard Kubernetes labels - for navigation and selection
+    app.kubernetes.io/name: {{ include "dcs-app.name" . }}  # Application name
+    app.kubernetes.io/instance: {{ .Release.Name }}  # Release name (e.g., "production", "staging")
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}  # Application version
+    app.kubernetes.io/managed-by: Helm  # Identifies that the Chart is managed by Helm
+    
+    # Platform-specific labels - used by Kyverno and the platform
+    managed-by: {{ .Values.labels.managedBy | quote }}  # Identifies that the app is managed by the platform
+    owner: {{ .Values.labels.owner | quote }}  # Application owner (team/developer)
+    
+    # Labels for HTTPRoute - Kyverno uses these to create HTTPRoute automatically for NGINX Gateway Fabric
+    dcs.ingress/enabled: {{ .Values.labels.dcsIngress.enabled | quote }}  # Whether to create HTTPRoute
+    dcs.ingress/host: {{ default "" .Values.labels.dcsIngress.host | quote }}  # Domain (if empty, Kyverno will set automatically)
+    dcs.ingress/path: {{ default "/" .Values.labels.dcsIngress.path | quote }}  # URL path
+    {{- if .Values.labels.dcsIngress.tls }}
+    dcs.ingress/tls: {{ .Values.labels.dcsIngress.tls | quote }}  # Enable TLS (uses cluster-wide certificate)
+    {{- end }}
+
 spec:
+  # Number of replicas (Pods) to run - set in values.yaml: replicaCount
   replicas: {{ .Values.replicaCount }}
+  
+  # Selector - which Pods belong to this Deployment
+  # Must match the Pod labels (see template.metadata.labels below)
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "dcs-app.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
+  
+  # Template - template for Pods to be created
   template:
     metadata:
       labels:
+        # Required labels - must match selector above!
         app.kubernetes.io/name: {{ include "dcs-app.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
+        
+        # Platform labels
         managed-by: {{ .Values.labels.managedBy | quote }}
         owner: {{ .Values.labels.owner | quote }}
+      
+      # Annotations - notes/metadata (not used for selection)
+      # Can be added via values.yaml: podAnnotations
+      {{- if .Values.podAnnotations }}
       annotations:
         {{- toYaml .Values.podAnnotations | nindent 8 }}
+      {{- end }}
+    
     spec:
+      # Service Account - for RBAC and pod identity
+      # If not specified, uses default service account in namespace
+      {{- if .Values.serviceAccount.name }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      
+      # Secrets for pulling images from private registry
+      # If needed, add in values.yaml: image.pullSecrets: ["secret-name"]
       {{- if .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml .Values.image.pullSecrets | nindent 8 }}
       {{- end }}
+      
+      # Init Containers - run before main container starts
+      # Useful for database migrations, waiting for dependencies, etc.
+      {{- if .Values.initContainers }}
+      initContainers:
+        {{- toYaml .Values.initContainers | nindent 8 }}
+      {{- end }}
+      
+      # Security Context at Pod level - security settings for all Pods
+      # Enabled if values.yaml: securityContext.enabled = true
       {{- if .Values.securityContext.enabled }}
       securityContext:
-        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
-        runAsUser: {{ .Values.securityContext.runAsUser }}
-        runAsGroup: {{ .Values.securityContext.runAsGroup }}
-        fsGroup: {{ .Values.securityContext.fsGroup }}
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}  # Runs as regular user (not root)
+        runAsUser: {{ .Values.securityContext.runAsUser }}  # User UID
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}  # Group GID
+        fsGroup: {{ .Values.securityContext.fsGroup }}  # GID for volumes
       {{- end }}
+      
+      # Containers - containers running in the Pod
       containers:
-        - name: {{ include "dcs-app.name" . }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+        - name: {{ include "dcs-app.name" . }}  # Container name
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"  # Docker image
+          imagePullPolicy: {{ .Values.image.pullPolicy }}  # When to pull image (Always/IfNotPresent/Never)
+          
+          # Security Context at Container level - security settings for container
           {{- if .Values.containerSecurityContext }}
           securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           {{- end }}
+          
+          # Ports - ports the container listens on
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.service.port }}  # Port from the application (e.g., 3000, 8080)
+          
+          # Environment Variables - environment variables
+          # Set in values.yaml: env (list of name: value)
+          {{- if .Values.env }}
           env: {{- toYaml .Values.env | nindent 12 }}
+          {{- end }}
+          
+          # Environment Variables from ConfigMap/Secret
+          # Set in values.yaml: envFrom (list of configMapRef/secretRef)
           {{- if .Values.envFrom }}
           envFrom: {{- toYaml .Values.envFrom | nindent 12 }}
           {{- end }}
-          {{- if and .Values.config.enabled (gt (len .Values.config.data) 0) }}
+          
+          # Volume Mounts - mounting volumes to container
+          {{- if or (and .Values.config.enabled (gt (len .Values.config.data) 0)) .Values.extraVolumeMounts }}
           volumeMounts:
-            - name: app-config
-              mountPath: /app/config
+            {{- if and .Values.config.enabled (gt (len .Values.config.data) 0) }}
+            # ConfigMap volume mount - config files
+            - name: app-config  # Volume name (see volumes below)
+              mountPath: /app/config  # Where to place files in container
+            {{- end }}
+            {{- if .Values.extraVolumeMounts }}
+            # Additional volume mounts
+            {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+            {{- end }}
           {{- end }}
+          
+          # Resources - CPU/memory limits
+          # ⚠️ Important to set in values.yaml: resources (limits + requests)
+          {{- if .Values.resources }}
           resources: {{- toYaml .Values.resources | nindent 12 }}
-      {{- if and .Values.config.enabled (gt (len .Values.config.data) 0) }}
+          {{- end }}
+          
+          # Health Checks - ⚠️ Critical for production!
+          # Liveness probe - detects if container is alive (restarts if fails)
+          {{- if .Values.livenessProbe }}
+          livenessProbe: {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          
+          # Readiness probe - detects if container is ready to serve traffic
+          {{- if .Values.readinessProbe }}
+          readinessProbe: {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          
+          # Startup probe - detects if container has started (for slow-starting apps)
+          {{- if .Values.startupProbe }}
+          startupProbe: {{- toYaml .Values.startupProbe | nindent 12 }}
+          {{- end }}
+          
+          # Lifecycle Hooks - run commands before shutdown or after start
+          {{- if .Values.lifecycle }}
+          lifecycle: {{- toYaml .Values.lifecycle | nindent 12 }}
+          {{- end }}
+      
+      # Volumes - volumes for mounting files/states
+      {{- if or (and .Values.config.enabled (gt (len .Values.config.data) 0)) .Values.extraVolumes }}
       volumes:
-        - name: app-config
+        {{- if and .Values.config.enabled (gt (len .Values.config.data) 0) }}
+        # ConfigMap volume - mounts config files from values.yaml: config.data
+        - name: app-config  # Volume name (must match volumeMounts above)
           configMap:
-            name: {{ include "dcs-app.fullname" . }}
+            name: {{ include "dcs-app.fullname" . }}  # ConfigMap name (created from configmap.yaml)
+        {{- end }}
+        {{- if .Values.extraVolumes }}
+        # Additional volumes (emptyDir, hostPath, etc.)
+        {{- toYaml .Values.extraVolumes | nindent 8 }}
+        {{- end }}
       {{- end }}
-

@@ -1,17 +1,41 @@
+{{- /*
+==============================================================================
+configmap.yaml - Kubernetes ConfigMap Template
+This file creates a ConfigMap containing configuration files for the application
+ConfigMap = way to pass config files to Pods (no secrets - use Secret for that)
+==============================================================================
+*/}}
+
+{{- /*
+  ConfigMap is created only if:
+  - values.yaml: config.enabled = true
+  - There is at least one file in values.yaml: config.data
+*/}}
 {{- if and .Values.config.enabled (gt (len .Values.config.data) 0) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "dcs-app.fullname" . }}
   labels:
+    # Standard labels - for navigation
     app.kubernetes.io/name: {{ include "dcs-app.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
+    
+    # Platform labels
     managed-by: {{ .Values.labels.managedBy | quote }}
     owner: {{ .Values.labels.owner | quote }}
-data:
-  {{- range $k, $v := .Values.config.data }}
-  {{ $k }}: |-
-    {{- $v | nindent 4 }}
-  {{- end }}
-{{- end }}
 
+data:
+  # Loop over all files in values.yaml: config.data
+  # Each key = file name, value = file content
+  # Example: config.data = { "app.properties": "key=value", "config.yaml": "server: port: 8080" }
+  {{- range $k, $v := .Values.config.data }}
+  {{ $k }}: |-  # |- = preserves newlines but removes trailing newlines
+    {{- $v | nindent 4 }}  # Adds indentation of 4 spaces
+  {{- end }}
+  
+  # 📝 Note: Files from this ConfigMap will be mounted to Pod via volumeMount
+  # (see deployment.yaml - volumeMounts: mountPath: /app/config)
+  # So file "app.properties" will be available at /app/config/app.properties in container
+
+{{- end }}

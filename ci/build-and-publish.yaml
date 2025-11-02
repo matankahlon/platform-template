@@ -1,45 +1,92 @@
-name: build-and-publish
+# ==============================================================================
+# build-and-publish.yaml - GitHub Actions CI/CD Pipeline
+# This file defines a pipeline for building and publishing Docker images and Helm Charts
+# ==============================================================================
+# 🔧 Required customization:
+# 1. Update tags and paths according to your Registry
+# 2. Add GitHub Secrets: DCS_REGISTRY_URL, DCS_REGISTRY_USER, DCS_REGISTRY_PASSWORD
+# 3. Adjust branches according to your GitFlow (main, develop, etc.)
+# ==============================================================================
 
+name: build-and-publish  # Workflow name
+
+# When does the workflow run?
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch: {}
+    branches: [ main ]  # 🔧 Change! - branch that triggers the build (e.g., ["main", "develop"])
+  workflow_dispatch: {}  # ✅ Keep - allows manual trigger from GitHub UI
 
 jobs:
+  # Job 1: Build and Push Docker Image
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Runner - Ubuntu (GitHub-hosted)
+    
     steps:
+      # Step 1: Checkout - pull code from repo
       - uses: actions/checkout@v4
+      
+      # Step 2: Setup QEMU - enables build for different platforms (e.g., arm64 on x86)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+      
+      # Step 3: Setup Docker Buildx - enables advanced build (multi-platform, cache, etc.)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      
+      # Step 4: Login to Registry
+      # 🔧 Important: Add Secrets in GitHub:
+      #   Settings → Secrets and variables → Actions → New repository secret
       - name: Login to Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.DCS_REGISTRY_URL }}
-          username: ${{ secrets.DCS_REGISTRY_USER }}
-          password: ${{ secrets.DCS_REGISTRY_PASSWORD }}
+          registry: ${{ secrets.DCS_REGISTRY_URL }}  # Registry address (e.g., "registry.company.com")
+          username: ${{ secrets.DCS_REGISTRY_USER }}  # Username
+          password: ${{ secrets.DCS_REGISTRY_PASSWORD }}  # Password
+      
+      # Step 5: Build and Push the image
+      # 🔧 Change! - Update path and tags according to your application:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: docker/Dockerfile.base
-          push: true
-          tags: ${{ secrets.DCS_REGISTRY_URL }}/dcs/app-base:${{ github.sha }}
+          context: .  # Context path (where the Dockerfile is)
+          file: docker/Dockerfile.base  # 🔧 Change! - path to your Dockerfile (e.g., "Dockerfile")
+          push: true  # Push to Registry (true) or just build (false)
+          tags: ${{ secrets.DCS_REGISTRY_URL }}/dcs/app-base:${{ github.sha }}  # 🔧 Change!
+            # Example: "registry.company.com/my-team/my-app:${{ github.sha }}"
+            # Or: "registry.company.com/my-team/my-app:${{ github.ref_name }}"
 
+  # Job 2: Package Helm Chart
   helm:
     runs-on: ubuntu-latest
-    needs: docker
+    needs: docker  # Runs only after docker job completes
+    
     steps:
+      # Step 1: Checkout - pull code
       - uses: actions/checkout@v4
+      
+      # Step 2: Package the Helm Chart
       - name: Package Helm Chart
         run: |
+          # Validation
           helm lint chart
+          
+          # Package Chart
           helm package chart --destination dist
+      
+      # Step 3: Upload Artifact - upload Chart to GitHub Artifacts
+      # Can be downloaded from GitHub UI → Actions → Artifacts
       - name: Upload Chart Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: helm-chart
-          path: dist/*.tgz
+          name: helm-chart  # Artifact name
+          path: dist/*.tgz  # Path to files to upload
 
+# 📝 Additional notes:
+# - Can add additional jobs: tests, security scanning, deployment, etc.
+# - Can add notifications: Slack, Teams, Email
+# - Can add matrix builds (build for multiple platforms/tags)
+# - Example of additional step - Publish Chart to Helm Registry:
+#   - name: Push Helm Chart
+#     run: |
+#       helm registry login ${{ secrets.DCS_REGISTRY_URL }}
+#       helm push dist/*.tgz oci://${{ secrets.DCS_REGISTRY_URL }}/charts
