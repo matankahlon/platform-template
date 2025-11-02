@@ -1,43 +1,62 @@
 # ==============================================================================
-# Dockerfile.base - Docker Base Image Template
-# This file defines a base image for DCS applications
+# Dockerfile.base - Weaversoft Platform Base Image
 # ==============================================================================
-# 📝 Note: This is a template - you'll probably want to create your own Dockerfile for the application
-# Files will be copied to /app and container will run as non-root user (security)
+# 🧩 Purpose:
+# This file defines the official base image for Weaversoft platform applications.
+# It provides a minimal, secure, non-root runtime environment for compiled applications (e.g., Go, Rust, C).
+# 
+# ⚠️ Note:
+# This image does NOT include a shell, package manager, or runtime (Node, Python, Java, etc.).
+# For interpreted languages, use a dedicated base image (e.g., distroless/nodejs, distroless/python3).
+#
+# Files are expected to be copied into /app, and the container runs as a non-root user for maximum security.
 # ==============================================================================
 
-# Base image - Distroless (minimal, high security, not root)
-# distroless = minimal image without shell/package manager (only binaries)
+# ------------------------------------------------------------------------------
+# Base image - Distroless (Debian 12, non-root)
+# ------------------------------------------------------------------------------
+# distroless = minimal image without shell or package manager (only binaries)
 # nonroot = runs as regular user (uid 65532), not root
 FROM gcr.io/distroless/base-debian12:nonroot
 
-# OCI Labels - image metadata (conforms to OCI spec)
-# 🔧 Change! - Update details according to your application:
-LABEL org.opencontainers.image.title="dcs-app-base" \
-      org.opencontainers.image.description="Minimal non-root base for DCS apps" \
-      org.opencontainers.image.vendor="DCS Platform" \
-      org.opencontainers.image.source="https://example.com/platform-template" \
+# ------------------------------------------------------------------------------
+# OCI Labels - image metadata (OCI-compliant)
+# ------------------------------------------------------------------------------
+LABEL org.opencontainers.image.title="weaversoft-base" \
+      org.opencontainers.image.description="Minimal non-root base image for Weaversoft platform apps" \
+      org.opencontainers.image.vendor="Weaversoft" \
+      org.opencontainers.image.source="https://git.weaversoft.io/platform-template" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-# Working directory - where the container runs
-# Application files will be copied here
+# ------------------------------------------------------------------------------
+# Working directory
+# ------------------------------------------------------------------------------
+# All application binaries and artifacts should be copied to this path by the final image.
 WORKDIR /app
 
-# 📝 Note: Expect application image to copy artifacts to /app and run as non-root user
-# Example in application:
-#   COPY --from=builder /app/dist /app
-#   USER 65532:65532  # Or another user if needed
-#   ENTRYPOINT ["/app/my-app"]
-
-# User - non-root user (uid 65532, gid 65532)
-# This is a built-in user in distroless nonroot images
-# 🔧 If application requires another user, change (but recommended to keep non-root!)
+# ------------------------------------------------------------------------------
+# Default user
+# ------------------------------------------------------------------------------
+# User - non-root (uid 65532, gid 65532)
+# Built into distroless images for enhanced security.
 USER 65532:65532
 
-# Entrypoint - what runs when container starts
-# ⚠️ This is just an example - in your application change to your app's CMD
+# ------------------------------------------------------------------------------
+# Entrypoint and default command
+# ------------------------------------------------------------------------------
+# ⚠️ Placeholder only! Replace these lines in your application-specific Dockerfile:
+# Example:
+#   ENTRYPOINT ["/app/my-service"]
+#   or
+#   ENTRYPOINT ["/app/server"]
+#
+# Keeping the container alive for demonstration/testing.
 ENTRYPOINT ["/bin/sh", "-c"]
-
-# CMD - default command (optional if Entrypoint is set)
-# ⚠️ This is just an example - in your application change to preview/test command
 CMD ["sleep infinity"]
+
+# ------------------------------------------------------------------------------
+# 🧩 Example usage for app developers:
+# ------------------------------------------------------------------------------
+# FROM registry.weaversoft.io/platform/weaversoft-base:1.0
+# COPY --from=builder /app/dist /app
+# ENTRYPOINT ["/app/my-app"]

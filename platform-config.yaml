@@ -8,7 +8,7 @@
 # ==============================================================================
 
 platform:
-  name: "dcs-platform"  # 🔧 Change! - Platform name
+  name: "weaversoft-platform"  # 🔧 Change! - Platform name
   
   # Registry settings - where Docker images and Charts are stored
   registry:
@@ -26,24 +26,22 @@ platform:
 
   # Conventions - standard platform settings
   conventions:
-    managedByLabel: "dcs-platform"  # ✅ Don't change - Label identifying that app is managed by platform
+    managedByLabel: "weaversoft-platform"  # ✅ Don't change - Label identifying that app is managed by platform
     ownerDefault: "default"  # 🔧 Change! - Default owner (if not set)
     serviceExposeAnnotation: "expose"  # ✅ Don't change - Kyverno looks for this annotation to create HTTPRoute
       # Kyverno looks for expose: "true" in Service to create HTTPRoute automatically
       # HTTPRoute is the modern Gateway API replacement for the legacy Ingress resource
     
     # Gateway settings - how Kyverno creates HTTPRoute for NGINX Gateway Fabric
-    gateway:
-      name: "dcs-gateway-fabric"  # 🔧 Change! - Gateway name in Kubernetes (NGINX Gateway Fabric)
-      namespace: "nginx-gateway"  # 🔧 Change! - Namespace where Gateway is located (usually "nginx-gateway")
-      tls: true  # ✅ Uses cluster-wide TLS certificate managed by NGINX Gateway Fabric
+  gateway:
+    name: "dcs-gateway-fabric"   # ✅ Do NOT change - fixed for all platform apps
+    namespace: "nginx-gateway"   # ✅ Do NOT change - fixed namespace for Gateway Fabric
+    tls: true                    # ✅ Default: true (cluster-wide TLS managed by NGINX Gateway Fabric)
     
-    # Labels for HTTPRoute - how Kyverno identifies HTTPRoute metadata
-    # Note: We use "ingress" in the label names for backward compatibility, but these create HTTPRoute resources
-    ingressLabels:
-      enabledKey: "dcs.ingress/enabled"  # ✅ Don't change - Label identifying whether to create HTTPRoute
-      hostKey: "dcs.ingress/host"  # ✅ Don't change - Label identifying the domain
-      pathKey: "dcs.ingress/path"  # ✅ Don't change - Label identifying the path
+  ingressLabels:
+    enabledKey: "dcs.ingress/enabled"  # (Not used in this cluster) - Kyverno uses annotation 'expose: true' instead
+    hostKey: "dcs.ingress/host"        # (For documentation only)
+    pathKey: "dcs.ingress/path"        # (For documentation only)
 
   # Default settings - recommended values to use
   defaults:

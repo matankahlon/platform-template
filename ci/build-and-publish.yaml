@@ -1,92 +1,86 @@
 # ==============================================================================
-# build-and-publish.yaml - GitHub Actions CI/CD Pipeline
-# This file defines a pipeline for building and publishing Docker images and Helm Charts
+# ci-template.yaml - Universal Build & Publish Pipeline
 # ==============================================================================
-# 🔧 Required customization:
-# 1. Update tags and paths according to your Registry
-# 2. Add GitHub Secrets: DCS_REGISTRY_URL, DCS_REGISTRY_USER, DCS_REGISTRY_PASSWORD
-# 3. Adjust branches according to your GitFlow (main, develop, etc.)
+# 🧩 Purpose:
+# This file defines a generic CI/CD pipeline for building and publishing
+# Docker images and Helm Charts in Weaversoft platform.
+#
+# It is platform-agnostic and can be adapted for:
+#   - GitHub Actions
+#   - GitLab CI/CD
+#   - Jenkins
+#   - Azure DevOps Pipelines
+#
+# 📝 Requirements:
+# 1. Environment variables or secrets must be provided:
+#    - REGISTRY_URL          (e.g., registry.weaversoft.io)
+#    - REGISTRY_USER
+#    - REGISTRY_PASSWORD
+# 2. Ensure Docker and Helm are installed on the runner/agent.
 # ==============================================================================
 
-name: build-and-publish  # Workflow name
+stages:
+  - build
+  - publish
+  - package
 
-# When does the workflow run?
-on:
-  push:
-    branches: [ main ]  # 🔧 Change! - branch that triggers the build (e.g., ["main", "develop"])
-  workflow_dispatch: {}  # ✅ Keep - allows manual trigger from GitHub UI
-
-jobs:
-  # Job 1: Build and Push Docker Image
-  docker:
-    runs-on: ubuntu-latest  # Runner - Ubuntu (GitHub-hosted)
+# ------------------------------------------------------------------------------
+# Stage 1: Build Docker image
+# ------------------------------------------------------------------------------
+build_image:
+  stage: build
+  script:
+    - echo "🔧 Logging in to registry..."
+    - echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USER" --password-stdin
     
-    steps:
-      # Step 1: Checkout - pull code from repo
-      - uses: actions/checkout@v4
-      
-      # Step 2: Setup QEMU - enables build for different platforms (e.g., arm64 on x86)
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      
-      # Step 3: Setup Docker Buildx - enables advanced build (multi-platform, cache, etc.)
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      # Step 4: Login to Registry
-      # 🔧 Important: Add Secrets in GitHub:
-      #   Settings → Secrets and variables → Actions → New repository secret
-      - name: Login to Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ secrets.DCS_REGISTRY_URL }}  # Registry address (e.g., "registry.company.com")
-          username: ${{ secrets.DCS_REGISTRY_USER }}  # Username
-          password: ${{ secrets.DCS_REGISTRY_PASSWORD }}  # Password
-      
-      # Step 5: Build and Push the image
-      # 🔧 Change! - Update path and tags according to your application:
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .  # Context path (where the Dockerfile is)
-          file: docker/Dockerfile.base  # 🔧 Change! - path to your Dockerfile (e.g., "Dockerfile")
-          push: true  # Push to Registry (true) or just build (false)
-          tags: ${{ secrets.DCS_REGISTRY_URL }}/dcs/app-base:${{ github.sha }}  # 🔧 Change!
-            # Example: "registry.company.com/my-team/my-app:${{ github.sha }}"
-            # Or: "registry.company.com/my-team/my-app:${{ github.ref_name }}"
-
-  # Job 2: Package Helm Chart
-  helm:
-    runs-on: ubuntu-latest
-    needs: docker  # Runs only after docker job completes
+    - echo "🏗️ Building Docker image..."
+    - docker build -t "$REGISTRY_URL/weaversoft/app-base:${CI_COMMIT_SHA:-latest}" -f docker/Dockerfile.base .
     
-    steps:
-      # Step 1: Checkout - pull code
-      - uses: actions/checkout@v4
-      
-      # Step 2: Package the Helm Chart
-      - name: Package Helm Chart
-        run: |
-          # Validation
-          helm lint chart
-          
-          # Package Chart
-          helm package chart --destination dist
-      
-      # Step 3: Upload Artifact - upload Chart to GitHub Artifacts
-      # Can be downloaded from GitHub UI → Actions → Artifacts
-      - name: Upload Chart Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: helm-chart  # Artifact name
-          path: dist/*.tgz  # Path to files to upload
+    - echo "✅ Build complete."
 
-# 📝 Additional notes:
-# - Can add additional jobs: tests, security scanning, deployment, etc.
-# - Can add notifications: Slack, Teams, Email
-# - Can add matrix builds (build for multiple platforms/tags)
-# - Example of additional step - Publish Chart to Helm Registry:
-#   - name: Push Helm Chart
-#     run: |
-#       helm registry login ${{ secrets.DCS_REGISTRY_URL }}
-#       helm push dist/*.tgz oci://${{ secrets.DCS_REGISTRY_URL }}/charts
+# ------------------------------------------------------------------------------
+# Stage 2: Publish Docker image
+# ------------------------------------------------------------------------------
+publish_image:
+  stage: publish
+  script:
+    - echo "📦 Pushing Docker image to registry..."
+    - docker push "$REGISTRY_URL/weaversoft/app-base:${CI_COMMIT_SHA:-latest}"
+  needs: [build_image]
+
+# ------------------------------------------------------------------------------
+# Stage 3: Package Helm Chart
+# ------------------------------------------------------------------------------
+package_chart:
+  stage: package
+  script:
+    - echo "📦 Packaging Helm Chart..."
+    - helm lint chart
+    - helm package chart --destination dist
+    - echo "✅ Helm chart packaged successfully."
+  artifacts:
+    paths:
+      - dist/*.tgz
+  needs: [publish_image]
+
+# ------------------------------------------------------------------------------
+# 🧠 Notes for CI system integration
+# ------------------------------------------------------------------------------
+# For GitHub Actions:
+#   - Convert 'stages' to 'jobs' and use 'runs-on' + 'steps' instead of 'stage/script'.
+#   - Replace ${CI_COMMIT_SHA} with ${{ github.sha }}.
+#
+# For GitLab CI/CD:
+#   - Save this file as '.gitlab-ci.yml' (works almost as-is).
+#
+# For Jenkins:
+#   - Use each stage as a pipeline 'stage' block within a Jenkinsfile.
+#
+# For Azure DevOps:
+#   - Convert each 'stage' to a separate job under 'jobs:'.
+#
+# ⚙️ Optional Enhancements:
+#   - Add security scans (Trivy, Grype)
+#   - Add tests before build
+#   - Add 'latest' tag push automatically
+#   - Push Helm chart to an OCI Helm registry if used

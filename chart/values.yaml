@@ -1,6 +1,19 @@
 # ==============================================================================
 # Application Configuration - This is the main place where you define your application
 # ==============================================================================
+# ⚠️ Important Notice:
+# Some sections in this file are shown with empty curly braces {} or brackets [] as placeholders.
+# When you need to configure those sections, remove the {} or [] and replace them with proper YAML indentation.
+# Example:
+#   resources:
+#     requests:
+#       cpu: "250m"
+#       memory: "256Mi"
+#     limits:
+#       cpu: "500m"
+#       memory: "512Mi"
+# This ensures correct YAML syntax and prevents Helm deployment errors.
+
 
 # ------------------------------------------------------------------------------
 # App Identification
@@ -12,7 +25,7 @@
 # Labels - Identifies the application in the platform
 # ------------------------------------------------------------------------------
 labels:
-  managedBy: "dcs-platform"  # ✅ Don't change - identifies that the app is managed by the platform
+  managedBy: "weaversoft-platform"  # ✅ Don't change - identifies that the app is managed by the platform
   owner: "default"  # 🔧 Change! - Set the team/owner name (e.g., "backend-team", "data-science")
   dcsIngress:
     enabled: true  # ✅ true = app will be exposed via HTTPRoute (Kyverno creates HTTPRoute automatically for NGINX Gateway Fabric)
@@ -26,7 +39,7 @@ labels:
 # ------------------------------------------------------------------------------
 image:
   repository: "registry.example.com/org/app"  # 🔧 Must change! - Your registry address (e.g., "registry.company.com/my-team/my-app")
-  tag: "latest"  # 🔧 Change! - Image tag (recommended: git-sha or semver like "1.0.0", not "latest" for production)
+  tag: "v1.0.0"  # 🔧 Change! - Image tag (recommended: git-sha or semver like "1.0.0", not "latest" for production)
   pullPolicy: IfNotPresent  # ✅ Usually no need to change (Always = always pull, IfNotPresent = only if not exists)
   pullSecrets: []  # 🔧 If private registry - add a list of secret names (e.g., ["regcred"])
 
@@ -52,13 +65,13 @@ podLabels: {}  # 🔧 Add additional pod labels if needed
 # ------------------------------------------------------------------------------
 # Compute Resources - ⚠️ Important to configure for production!
 # ------------------------------------------------------------------------------
-resources: {}  # 🔧 Must change for production! - Set limits and requests:
-  # limits:
-  #   cpu: "500m"      # Maximum CPU
-  #   memory: "512Mi"  # Maximum memory
-  # requests:
-  #   cpu: "250m"      # Minimum required CPU
-  #   memory: "256Mi"  # Minimum required memory
+resources:  # 🔧 Must change for production! - Set limits and requests:
+  requests:
+    cpu: "250m"     # Minimum CPU
+    memory: "256Mi" # Minimum memory
+  limits:
+    cpu: "500m"     # Maximum CPU
+    memory: "512Mi" # Maximum memory
 
 # ------------------------------------------------------------------------------
 # Security - Pod Security Context (Pod level)
@@ -109,12 +122,12 @@ envFrom: []  # 🔧 Add if need to load variables from ConfigMap or Secret:
 config:
   enabled: false  # 🔧 Change to true if need to mount config files
   data: {}  # 🔧 If enabled: true, add config files here:
-    # app.properties: |
-    #   key1=value1
-    #   key2=value2
-    # config.yaml: |
-    #   server:
-    #     port: 8080
+  # app.properties: |
+  #   ENV=production
+  #   LOG_LEVEL=info
+  # config.yaml: |
+  #   server:
+  #     port: 8080
   # 📝 Files will be mounted to /app/config in the container
 
 # ------------------------------------------------------------------------------
