@@ -1,0 +1,16 @@
+FROM gcr.io/distroless/base-debian12:nonroot
+
+LABEL org.opencontainers.image.title="dcs-app-base" \
+      org.opencontainers.image.description="Minimal non-root base for DCS apps" \
+      org.opencontainers.image.vendor="DCS Platform" \
+      org.opencontainers.image.source="https://example.com/platform-template" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+WORKDIR /app
+
+# Expect app image to COPY built artifacts to /app and run as non-root
+USER 65532:65532
+
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["sleep infinity"]
+

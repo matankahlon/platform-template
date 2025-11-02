@@ -1,0 +1,60 @@
+# Global app identifiers
+nameOverride: ""
+fullnameOverride: ""
+
+labels:
+  managedBy: "dcs-platform"
+  owner: "default"
+  dcsIngress:
+    enabled: true           # metadata only; Kyverno reads Service annotation expose: "true"
+    host: ""
+    path: "/"
+
+image:
+  repository: "registry.example.com/org/app"
+  tag: "latest"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+resources: {}
+
+securityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  readOnlyRootFilesystem: true
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+affinity: {}
+tolerations: []
+
+env: []          # list of { name: KEY, value: "VAL" }
+envFrom: []      # list of configMapRef/secretRef
+
+config:
+  enabled: false
+  data: {}       # key: value pairs to mount as files via ConfigMap
+
+# Ingress exposure control for Kyverno
+ingress:
+  enabled: true   # when true, Service will get annotation expose: "true"
+  host: ""       # metadata only
+  path: "/"
+

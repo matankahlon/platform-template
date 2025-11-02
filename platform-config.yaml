@@ -1,0 +1,31 @@
+platform:
+  name: "dcs-platform"
+  registry:
+    url: "registry.example.com"
+    org: "dcs"
+    chart_repo: "charts"   # optional OCI helm repo
+  tagging:
+    strategy: "git-sha"     # options: git-sha, semver, datetime
+    latestAlias: true
+
+  conventions:
+    managedByLabel: "dcs-platform"
+    ownerDefault: "default"
+    serviceExposeAnnotation: "expose"  # Kyverno listens for expose: "true"
+    gateway:
+      name: "dcs-gateway-fabric"
+      namespace: "nginx-gateway"
+    ingressLabels:
+      enabledKey: "dcs.ingress/enabled"
+      hostKey: "dcs.ingress/host"
+      pathKey: "dcs.ingress/path"
+
+  defaults:
+    service:
+      type: "ClusterIP"
+      port: 80
+    security:
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
+
